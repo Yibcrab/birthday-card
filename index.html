@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>劉豬豬生日快樂</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Noto+Serif+TC:wght@300;400;600&family=Playfair+Display:ital,wght@0,600;1,400&display=swap');
+
+        :root {
+            --bg-creme: #FBF9F5;
+            --paper-color: #FFFDF9;
+            --ink-primary: #2C2623;
+            --ink-muted: #78716C;
+            --gold-accent: #C5A880;
+        }
+
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #f7f4ee;
+            background-image: radial-gradient(#e5dfd3 1px, transparent 1px), radial-gradient(#e5dfd3 1px, #f7f4ee 1px);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+            color: var(--ink-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .serif-en {
+            font-family: 'Cormorant Garamond', serif;
+        }
+
+        .display-title {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* 3D Envelope Physics */
+        .envelope-container {
+            perspective: 1200px;
+        }
+
+        .flap {
+            transform-origin: top center;
+            transition: transform 0.75s cubic-bezier(0.4, 0, 0.2, 1), z-index 0.2s;
+        }
+
+        .envelope-open .flap {
+            transform: rotateX(180deg);
+            z-index: 1 !important;
+        }
+
+        .letter {
+            transition: transform 0.85s cubic-bezier(0.34, 1.3, 0.64, 1) 0.35s, opacity 0.5s ease 0.3s;
+        }
+
+        .envelope-open .letter {
+            transform: translateY(-160px);
+            z-index: 5;
+        }
+
+        /* Paper texture & seal effect */
+        .letter-paper {
+            background: linear-gradient(180deg, #FFFFFF 0%, #FAF8F5 100%);
+            box-shadow: 0 20px 40px -15px rgba(84, 70, 56, 0.15), 0 0 0 1px rgba(197, 168, 128, 0.25);
+        }
+
+        /* Candle Flame Physics */
+        @keyframes flameWiggle {
+            0%, 100% { transform: scale(1) rotate(-1deg); filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6)); }
+            25% { transform: scale(1.08, 0.94) rotate(2deg); filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8)); }
+            50% { transform: scale(0.96, 1.04) rotate(-2deg); filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.5)); }
+            75% { transform: scale(1.04, 0.98) rotate(1deg); filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.9)); }
+        }
+        .flame-alive {
+            animation: flameWiggle 1.8s infinite ease-in-out;
+            transform-origin: bottom center;
+        }
+
+        /* Ambient floating micro sparkles */
+        @keyframes subtleDrift {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+            50% { opacity: 0.6; }
+            100% { transform: translateY(-70px) rotate(45deg); opacity: 0; }
+        }
+        .sparkle-dot {
+            position: absolute;
+            pointer-events: none;
+            animation: subtleDrift 6s infinite ease-out;
+        }
+
+        /* Password Gate Overlay */
+        #password-gate {
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+        #password-gate.unlocked {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between p-4 sm:p-8 min-h-screen">
+
+    <!-- PASSWORD GATE OVERLAY (非公開專屬密碼鎖) -->
+    <div id="password-gate" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#f7f4ee]/95 backdrop-blur-md">
+        <div class="letter-paper w-full max-w-sm rounded-2xl p-6 sm:p-8 border border-[#e2dcd2] shadow-[0_20px_50px_rgba(60,50,40,0.15)] flex flex-col items-center text-center">
+            <div class="w-12 h-12 rounded-full bg-[#f3ede2] flex items-center justify-center border border-[#d8d0c5] text-[#8b2621] mb-4">
+                <i data-lucide="lock" class="w-5 h-5"></i>
+            </div>
+            <span class="serif-en italic text-xs text-[#a89b8d] tracking-widest">PRIVATE ACCESS</span>
+            <h3 class="text-base font-semibold text-[#2c2623] mt-1 tracking-wider">輸入專屬通關密碼</h3>
+            <p class="text-xs text-[#8c827a] mt-1.5 tracking-wide font-light">這封信件已上鎖，請輸入密碼解鎖</p>
+
+            <form id="password-form" class="w-full mt-5 flex flex-col items-center">
+                <input 
+                    type="password" 
+                    id="password-input" 
+                    placeholder="請輸入密碼" 
+                    autocomplete="off"
+                    class="w-full px-4 py-2.5 rounded-full text-center text-sm tracking-widest bg-white border border-[#d8d0c5] focus:outline-none focus:border-[#c5a880] text-[#2c2623] shadow-inner transition"
+                >
+                <p id="password-error" class="hidden text-[11px] text-[#9e3a35] mt-2 tracking-wide font-medium">密碼錯誤，再試一次！</p>
+                
+                <button type="submit" class="w-full mt-4 py-2.5 rounded-full text-xs font-sans tracking-widest bg-[#2c2623] hover:bg-[#453d37] text-[#FAF8F5] shadow-[0_4px_12px_rgba(44,38,35,0.15)] transition-all duration-300 active:scale-95 flex items-center justify-center gap-2">
+                    <i data-lucide="key" class="w-3.5 h-3.5 text-[#c5a880]"></i>
+                    <span>解鎖開啟卡片</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Top Delicate Header & Music Player (Item 5) -->
+    <header class="w-full max-w-2xl flex justify-between items-center py-4 z-40 border-b border-[#e2dcd2]">
+        <div class="flex items-center space-x-2">
+            <span class="w-2 h-2 rounded-full bg-[#c5a880] animate-ping"></span>
+            <span class="text-xs tracking-[0.25em] text-[#8c827a] uppercase font-sans font-medium">給小屁孩的信</span>
+        </div>
+        
+        <!-- Music Box Button -->
+        <button id="music-toggle" class="group flex items-center space-x-2 bg-white/80 hover:bg-white text-[#5c5248] px-4 py-1.5 rounded-full border border-[#d8d0c5] shadow-sm transition-all duration-300 active:scale-95 text-xs font-sans">
+            <i data-lucide="music-2" class="w-3.5 h-3.5 text-[#c5a880] transition group-hover:rotate-12"></i>
+            <span id="music-text" class="tracking-wider">播放音樂盒</span>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="w-full max-w-xl flex flex-col items-center my-auto py-8">
+
+        <!-- Title Section -->
+        <div class="text-center mb-10 select-none">
+            <span class="serif-en italic text-xl sm:text-2xl text-[#a39485] font-light">Happy Birthday</span>
+            <h1 class="display-title text-3xl sm:text-4xl text-[#2c2623] font-semibold mt-1 tracking-tight">
+                劉文堯，生日快樂
+            </h1>
+            <p class="text-xs text-[#8c827a] mt-2.5 tracking-widest font-light">
+                開信怪談 規則如下: 
+                1.要愛蔡宥儀
+                2.不要兇蔡宥儀
+                3.你是豬
+            </p>
+        </div>
+
+        <!-- 1. INTERACTIVE ENVELOPE & LETTER (Item 1) -->
+        <div class="w-full mb-16 flex flex-col items-center">
+            
+            <div id="envelope-root" class="envelope-container relative w-[320px] sm:w-[380px] h-[240px] cursor-pointer group">
+                
+                <!-- Back Paper of Envelope Base -->
+                <div class="absolute inset-0 bg-[#E8E2D8] rounded-xl shadow-xl border border-[#dcd4c7]"></div>
+
+                <!-- Hidden Sliding Letter Inside -->
+                <div id="letter-slide" class="letter absolute inset-x-3 top-2 bottom-3 letter-paper rounded-lg p-5 z-[2] flex flex-col items-center justify-between text-center overflow-hidden border border-[#eae3d8]">
+                    <div class="w-full flex justify-between items-center opacity-40 border-b border-[#e2dcd2] pb-1">
+                        <span class="serif-en text-[10px] tracking-widest uppercase">給我最愛的同學</span>
+                        <i data-lucide="heart" class="w-3 h-3 text-[#c5a880] fill-[#c5a880]"></i>
+                    </div>
+                    <div class="my-auto py-2">
+                        <p class="serif-en italic text-[#998b7e] text-sm">hehe</p>
+                        <p class="text-xs font-semibold text-[#3d352e] mt-1 tracking-wide">我想把卡片做得特別一點</p>
+                    </div>
+                    <span class="text-[9px] text-[#b0a599] font-sans tracking-widest">-蔡宥儀</span>
+                </div>
+
+                <!-- Envelope Lower Pocket Front (Left & Right triangles + Bottom) -->
+                <div class="absolute inset-0 z-[3] pointer-events-none overflow-hidden rounded-xl">
+                    <!-- Left Fold -->
+                    <div class="absolute inset-0" style="clip-path: polygon(0 0, 0 100%, 50% 50%); background: #ded6c9;"></div>
+                    <!-- Right Fold -->
+                    <div class="absolute inset-0" style="clip-path: polygon(100% 0, 100% 100%, 50% 50%); background: #d7cfc2;"></div>
+                    <!-- Bottom Fold -->
+                    <div class="absolute inset-0" style="clip-path: polygon(0 100%, 100% 100%, 50% 48%); background: linear-gradient(180deg, #ede7de 0%, #e2dacd 100%);"></div>
+                </div>
+
+                <!-- Envelope Top Flap -->
+                <div id="envelope-flap" class="flap absolute inset-x-0 top-0 h-[125px] z-[4] origin-top" style="clip-path: polygon(0 0, 100% 0, 50% 100%); background: linear-gradient(180deg, #dfd7cb 0%, #cec5b8 100%);">
+                </div>
+
+                <!-- Wax Seal Center Button -->
+                <div id="wax-seal" class="absolute left-1/2 top-[125px] -translate-x-1/2 -translate-y-1/2 z-[5] transition-transform duration-300 group-hover:scale-105 flex flex-col items-center">
+                    <div class="w-12 h-12 rounded-full bg-[#9e3a35] shadow-[0_4px_10px_rgba(158,58,53,0.35)] flex items-center justify-center border-2 border-[#862e2a] text-[#fceeed]">
+                        <i data-lucide="stamp" class="w-5 h-5 opacity-90"></i>
+                    </div>
+                    <span class="mt-2 text-[11px] font-sans text-[#78716c] tracking-widest opacity-80 group-hover:opacity-100 transition">輕觸拆信</span>
+                </div>
+            </div>
+
+            <!-- Expanded Letter Modal / Sheet (Revealed when envelope opens) -->
+            <div id="expanded-letter" class="hidden w-full mt-4 transition-all duration-700 ease-out">
+                <div class="letter-paper rounded-2xl p-6 sm:p-9 border border-[#e5dfd4] shadow-[0_20px_50px_rgba(60,50,40,0.08)] relative">
+                    
+                    <!-- Paper corner stamp -->
+                    <div class="flex justify-between items-start border-b border-[#eee8df] pb-4 mb-6">
+                        <div>
+                            <span class="serif-en italic text-xs text-[#a89b8d] tracking-widest block">Happy Birthday</span>
+                            <span class="text-sm font-medium text-[#4a4036] tracking-wider">致我最喜歡的同學：</span>
+                        </div>
+                        <div class="flex items-center space-x-1 text-[#c5a880] opacity-80">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+
+                    <!-- Main Message -->
+                    <div id="message-container" class="space-y-4 text-[14px] sm:text-[15px] leading-relaxed text-[#3d352e] tracking-wide font-light">
+                        <p>
+                            劉文堯生日快樂！🎂
+                        </p>
+                        <p>
+                            其實有時候想想還是覺得很神奇，從一開始的我們，到現在已經一起經歷了這麼多事情。
+還記得一開始的時候，雖然你常常說愛我，但那時候的我其實不太能感受到。中間我們也經歷過很多不愉快，甚至有一段時間真的以為我們可能走不下去了。但很慶幸，我們還是一起走到了現在。
+                        </p>
+                        <p>
+                            我好喜歡跟你出門時牽著手，喜歡一起打球、看你比賽、出去玩、吃飯，也喜歡什麼都不做，只是待在你身邊。
+我也喜歡你想我的時候會告訴我，喜歡你打視訊給我，即使只是分享一些小事，或是沒有什麼話題，單純看看對方，我都覺得很幸福。
+                        </p>
+                        <p>
+                            還有一次我們一起睡覺，明明施工的聲音讓你覺得很吵，你卻還是選擇摀住我的耳朵。其實這些小小的事情，我都有放在心上。
+
+                        </p>
+                        <p>
+                            我希望以後不管是開心的事情，還是難熬的日子，我都能陪在你身邊。你想完成的事情，我希望自己能成為支持你的人；你遇到挫折的時候，也希望你知道，你不是一個人。希望你也能一直保有自己的正直和熱情，勇敢去做自己想做的事情，成為自己想成為的人。不要因為別人的眼光或別人的話，就忘記自己原本的樣子。
+
+                        </p>
+                        <p>
+                            還有我們不是說過要一起出國滑雪嗎？希望未來我們可以一起探索更多沒去過的地方，體驗更多沒做過的事情，也一起把平凡的日子過得很有趣。
+我不敢說未來一定會有多完美，但我希望我們可以繼續一起經歷生活裡大大小小的事情。當你的好朋友、你的隊友，也是你最親近的戀人。
+如果有一天你覺得很累，或是覺得沒有人懂你，也希望你記得，我一直都在。
+
+
+                        </p>
+                        <p class="pt-4 text-right text-[#574d43] font-medium leading-loose">
+                            生日快樂笨豬豬，我愛你<br>
+                            <span class="serif-en text-sm italic text-[#8c827a]">— 蔡宥儀</span>
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 2. MINIMALIST FRENCH CAKE & CANDLE (Item 2) -->
+        <section class="w-full flex flex-col items-center pt-8 border-t border-[#e2dcd2]">
+            <span class="serif-en italic text-[#a39485] text-sm">Make a wish</span>
+            <h2 class="text-lg font-semibold text-[#2c2623] mt-0.5 tracking-wider">吹蠟燭許願~</h2>
+            <p class="text-xs text-[#8c827a] mt-1 font-light tracking-wide">點燭火或按鈕可以吹熄</p>
+
+            <!-- Refined Minimalist Cake Illustration -->
+            <div class="relative w-48 h-48 my-6 flex flex-col items-center justify-end select-none">
+                
+                <!-- Glowing Candle Flame -->
+                <div id="candle-flame" class="flame-alive cursor-pointer relative z-30 mb-[-1px] transition-all duration-700" title="點擊吹熄蠟燭">
+                    <div class="w-3.5 h-6 bg-gradient-to-t from-[#f59e0b] via-[#fbbf24] to-[#fffbeb] rounded-[50%_50%_25%_25%] shadow-[0_0_15px_#f59e0b]"></div>
+                </div>
+
+                <!-- Slender Golden Candle -->
+                <div class="w-1.5 h-10 bg-gradient-to-r from-[#d4af37] via-[#f7e7a9] to-[#c5a028] rounded-t-sm z-20 shadow-sm"></div>
+
+                <!-- Minimalist Single-tier Cake with Cream Drip & Fresh Cherries -->
+                <div class="relative w-36 h-20 bg-gradient-to-b from-[#FFFDF9] to-[#F3EDE2] rounded-t-2xl rounded-b-lg border border-[#e2dacd] shadow-[0_15px_25px_-5px_rgba(80,65,50,0.12)] flex flex-col items-center justify-start overflow-hidden">
+                    
+                    <!-- Cake Top Cream Layer -->
+                    <div class="w-full h-3 bg-[#FCFBF8] border-b border-[#ece4d8] flex justify-around items-center px-4">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#8b2621]"></span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#8b2621]"></span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#8b2621]"></span>
+                    </div>
+
+                    <!-- Delicate Cake Ribbon Decor -->
+                    <div class="my-auto text-center">
+                        <span class="serif-en italic text-[11px] tracking-widest text-[#948779] block">抹茶蛋糕</span>
+                        <div class="w-8 h-[1px] bg-[#c5a880] mx-auto mt-0.5 opacity-60"></div>
+                    </div>
+                </div>
+
+                <!-- Elegant Porcelain Plate -->
+                <div class="w-48 h-2.5 bg-gradient-to-b from-[#FAF8F5] to-[#E5DFD4] rounded-full shadow-md border-t border-white mt-[-2px]"></div>
+            </div>
+
+            <!-- Interactive Wish Status & Blow Button -->
+            <div id="wish-prompt" class="text-xs text-[#78716c] font-light tracking-widest mb-4 transition-all">
+                (你不可以一直重新許願哦!哈哈哈) 
+            </div>
+
+            <button id="blow-candle-btn" class="px-6 py-2 rounded-full text-xs font-sans tracking-widest bg-[#2c2623] hover:bg-[#453d37] text-[#FAF8F5] shadow-[0_4px_12px_rgba(44,38,35,0.15)] transition-all duration-300 active:scale-95 flex items-center gap-2">
+                <i data-lucide="wind" class="w-3.5 h-3.5 text-[#c5a880]"></i>
+                <span id="blow-btn-text">吹蠟燭許願</span>
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Refined Minimal Footer -->
+    <footer class="w-full max-w-2xl py-6 text-center border-t border-[#e2dcd2] text-[11px] text-[#a3978c] tracking-widest">
+         • Happy Birthday
+    </footer>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        lucide.createIcons();
+
+        /* --- 1. ENVELOPE OPENING & LETTER EXPANSION (Item 1) --- */
+        const envelopeRoot = document.getElementById('envelope-root');
+        const expandedLetter = document.getElementById('expanded-letter');
+        const waxSeal = document.getElementById('wax-seal');
+        let isOpened = false;
+
+        envelopeRoot.addEventListener('click', () => {
+            if (isOpened) return;
+            isOpened = true;
+
+            envelopeRoot.classList.add('envelope-open');
+            waxSeal.style.opacity = '0';
+            waxSeal.style.pointerEvents = 'none';
+
+            // Gentle gold & cream confetti burst
+            confetti({
+                particleCount: 45,
+                spread: 60,
+                colors: ['#c5a880', '#e0cfb8', '#9e3a35', '#2c2623'],
+                origin: { y: 0.65 }
+            });
+
+            // Smooth reveal of full message paper
+            setTimeout(() => {
+                expandedLetter.classList.remove('hidden');
+                expandedLetter.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 750);
+        });
+
+        /* --- 2. CANDLE BLOWING & WISH CELEBRATION (Item 2) --- */
+        const flame = document.getElementById('candle-flame');
+        const blowBtn = document.getElementById('blow-candle-btn');
+        const blowBtnText = document.getElementById('blow-btn-text');
+        const wishPrompt = document.getElementById('wish-prompt');
+        let candleIsLit = true;
+
+        function blowOutOnce() {
+            // 吹熄後即鎖定，不能重複許願
+            if (!candleIsLit) return;
+            candleIsLit = false;
+
+            // Blow out
+            flame.style.opacity = '0';
+            flame.style.transform = 'scale(0.3) translateY(-10px)';
+            flame.style.pointerEvents = 'none';
+            flame.classList.remove('cursor-pointer');
+
+            wishPrompt.innerHTML = " 祝你願望成真！";
+            wishPrompt.classList.add('text-[#8b2621]', 'font-normal');
+            
+            // 禁用按鈕，防止重複點燃
+            blowBtn.disabled = true;
+            blowBtn.classList.remove('hover:bg-[#453d37]', 'active:scale-95');
+            blowBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Grand celebration confetti
+            const duration = 2.5 * 1000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#c5a880', '#e5dfd3', '#8b2621']
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#c5a880', '#e5dfd3', '#8b2621']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
+        }
+
+        flame.addEventListener('click', blowOutOnce);
+        blowBtn.addEventListener('click', blowOutOnce);
+
+        /* --- 3. WEB AUDIO MUSIC BOX MELODY (Item 5) --- */
+        let audioCtx = null;
+        let isPlaying = false;
+        let timerId = null;
+
+        const pitchMap = {
+            'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23,
+            'G4': 392.00, 'A4': 440.00, 'B4': 493.88, 'C5': 523.25,
+            'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99
+        };
+
+        const birthdayScore = [
+            ['G4', 0.45], ['G4', 0.35], ['A4', 0.75], ['G4', 0.75], ['C5', 0.75], ['B4', 1.3],
+            ['G4', 0.45], ['G4', 0.35], ['A4', 0.75], ['G4', 0.75], ['D5', 0.75], ['C5', 1.3],
+            ['G4', 0.45], ['G4', 0.35], ['G5', 0.75], ['E5', 0.75], ['C5', 0.75], ['B4', 0.75], ['A4', 0.95],
+            ['F5', 0.45], ['F5', 0.35], ['E5', 0.75], ['C5', 0.75], ['D5', 0.75], ['C5', 1.5]
+        ];
+
+        function playChime(freq, startTime, duration) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            // High harmonic bell overtone for realistic music box timbre
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, startTime);
+
+            // Envelope
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(0.18, startTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        }
+
+        function playMelodyLoop() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            let cursor = audioCtx.currentTime + 0.1;
+            birthdayScore.forEach(([note, len]) => {
+                playChime(pitchMap[note], cursor, len * 1.6);
+                cursor += len * 0.78;
+            });
+
+            const loopTime = (cursor - audioCtx.currentTime) * 1000;
+            timerId = setTimeout(() => {
+                if (isPlaying) playMelodyLoop();
+            }, loopTime + 1200);
+        }
+
+        const musicToggle = document.getElementById('music-toggle');
+        const musicText = document.getElementById('music-text');
+
+        musicToggle.addEventListener('click', () => {
+            if (!isPlaying) {
+                isPlaying = true;
+                playMelodyLoop();
+                musicText.textContent = "暫停旋律";
+                musicToggle.classList.add('bg-[#f3ede2]', 'border-[#c5a880]');
+            } else {
+                isPlaying = false;
+                clearTimeout(timerId);
+                if (audioCtx) audioCtx.suspend();
+                musicText.textContent = "播放音樂盒";
+                musicToggle.classList.remove('bg-[#f3ede2]', 'border-[#c5a880]');
+            }
+        });
+
+        /* --- 4. PASSWORD GATE LOGIC (非公開密碼保護) --- */
+        const SECRET_CODE = "1114"; 
+
+        const passwordGate = document.getElementById('password-gate');
+        const passwordForm = document.getElementById('password-form');
+        const passwordInput = document.getElementById('password-input');
+        const passwordError = document.getElementById('password-error');
+
+        passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (passwordInput.value.trim() === SECRET_CODE) {
+                passwordGate.classList.add('unlocked');
+                passwordError.classList.add('hidden');
+            } else {
+                passwordError.classList.remove('hidden');
+                passwordInput.value = '';
+                passwordInput.classList.add('border-[#9e3a35]');
+                setTimeout(() => {
+                    passwordInput.classList.remove('border-[#9e3a35]');
+                }, 1500);
+            }
+        });
+    </script>
+</body>
+</html>
